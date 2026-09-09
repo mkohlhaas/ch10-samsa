@@ -1,4 +1,4 @@
-//! Sealed trait pattern for message schemas
+//! Sealed trait pattern for message codecs
 //!
 //! This module demonstrates the sealed trait pattern to create
 //! type-safe message handling with controlled extensibility.
@@ -25,11 +25,11 @@ mod private {
 // 2. Sealed Trait //
 // =============== //
 
-// -------------- //
-// Message Schema //
-// -------------- //
+// ------------- //
+// Message Codec //
+// ------------- //
 
-/// A sealed trait for message schemas
+/// A sealed trait for message codecs
 ///
 /// Only types within this crate can implement MessageCodec,
 /// ensuring API stability and type safety.
@@ -41,29 +41,31 @@ pub trait MessageCodec: private::Sealed {
     fn serialize(message: &Self::Message) -> Vec<u8>;
 
     /// Deserialize bytes to a message
-    fn deserialize(bytes: &[u8]) -> Result<Self::Message, SchemaError>;
+    fn deserialize(bytes: &[u8]) -> Result<Self::Message, CodecError>;
 
     /// Get the format identifier
     fn format_id() -> &'static str;
 
-    /// Validate a message according to schema rules
+    /// Validate a message according to codec rules
     fn validate(message: &Self::Message) -> Result<(), ValidationError>;
 }
 
+// ================ //
 // 3. Typed Message //
+// ================ //
 
 // A message struct with MessageCodec as a trait bound.
 
 /// A type-safe message container
 ///
-/// Messages are parameterized by their schema, ensuring
+/// Messages are parameterized by their codec, ensuring
 /// compile-time guarantees about message structure.
 /// see examples
 #[derive(Debug, Clone)]
 pub struct TypedMessage<S: MessageCodec> {
     pub id: MessageId,
     pub content: S::Message,
-    pub schema_type: PhantomData<S>,
+    pub codec_type: PhantomData<S>,
 }
 
 // calls function in the MessageCodec
@@ -76,7 +78,7 @@ impl<S: MessageCodec> TypedMessage<S> {
         Ok(TypedMessage {
             id,
             content,
-            schema_type: PhantomData,
+            codec_type: PhantomData,
         })
     }
 
@@ -86,7 +88,7 @@ impl<S: MessageCodec> TypedMessage<S> {
         S::serialize(&self.content)
     }
 
-    /// Get the schema identifier
+    /// Get the codec identifier
     pub fn format_id(&self) -> &'static str {
         // calling function from the trait
         S::format_id()
@@ -99,32 +101,32 @@ impl<S: MessageCodec> TypedMessage<S> {
 
 // Maybe errors should be put in file error.rs.
 
-// -------------- //
-// A. SchemaError //
-// -------------- //
+// ------------- //
+// A. CodecError //
+// ------------- //
 
-/// Errors that can occur during schema operations (deserialization function)
+/// Errors that can occur during codec operations (deserialization function)
 /// Could be called DeserializationError.
 #[derive(Debug, Clone)]
-pub enum SchemaError {
+pub enum CodecError {
     InvalidFormat,
     UnknownVersion,
     CorruptedData,
     DeserializationFailed(String), // actually the only one really used (in deserialization functions)
 }
 
-impl Display for SchemaError {
+impl Display for CodecError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SchemaError::InvalidFormat => write!(f, "Invalid message format"),
-            SchemaError::UnknownVersion => write!(f, "Unknown schema version"),
-            SchemaError::CorruptedData => write!(f, "Corrupted message data"),
-            SchemaError::DeserializationFailed(msg) => write!(f, "Deserialization failed: {}", msg),
+            CodecError::InvalidFormat => write!(f, "Invalid message format"),
+            CodecError::UnknownVersion => write!(f, "Unknown codec version"),
+            CodecError::CorruptedData => write!(f, "Corrupted message data"),
+            CodecError::DeserializationFailed(msg) => write!(f, "Deserialization failed: {}", msg),
         }
     }
 }
 
-impl Error for SchemaError {}
+impl Error for CodecError {}
 
 // ------------------ //
 // B. ValidationError //
@@ -156,15 +158,15 @@ impl Display for ValidationError {
 
 impl Error for ValidationError {}
 
-// =============== //
-// Message Schemas //
-// =============== //
+// ============== //
+// Message Codecs //
+// ============== //
 
-// ------------- //
-// A. JsonSchema //
-// ------------- //
+// ------------ //
+// A. JsonCodec //
+// ------------ //
 
-/// JSON schema using serde_json for flexible message structures
+/// JSON Codec using serde_json for flexible message structures
 pub struct JsonCodec;
 
 impl private::Sealed for JsonCodec {}
@@ -176,8 +178,8 @@ impl MessageCodec for JsonCodec {
         serde_json::to_vec(message).unwrap_or_default()
     }
 
-    fn deserialize(bytes: &[u8]) -> Result<Self::Message, SchemaError> {
-        serde_json::from_slice(bytes).map_err(|e| SchemaError::DeserializationFailed(e.to_string()))
+    fn deserialize(bytes: &[u8]) -> Result<Self::Message, CodecError> {
+        serde_json::from_slice(bytes).map_err(|e| CodecError::DeserializationFailed(e.to_string()))
     }
 
     fn format_id() -> &'static str {
@@ -197,11 +199,11 @@ impl MessageCodec for JsonCodec {
 
 pub type JsonMessage = TypedMessage<JsonCodec>;
 
-// ------------- //
-// B. TextSchema //
-// ------------- //
+// ------------ //
+// B. TextCodec //
+// ------------ //
 
-/// Text schema for simple string messages
+/// Text codec for simple string messages
 pub struct TextCodec;
 
 impl private::Sealed for TextCodec {}
@@ -213,9 +215,9 @@ impl MessageCodec for TextCodec {
         message.as_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &[u8]) -> Result<Self::Message, SchemaError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self::Message, CodecError> {
         String::from_utf8(bytes.to_vec())
-            .map_err(|e| SchemaError::DeserializationFailed(e.to_string()))
+            .map_err(|e| CodecError::DeserializationFailed(e.to_string()))
     }
 
     fn format_id() -> &'static str {
@@ -246,9 +248,9 @@ pub type TextMessage = TypedMessage<TextCodec>;
 // Message Handler //
 // =============== //
 
-/// Type-safe message handler that works with any valid schema
+/// Type-safe message handler that works with any valid codec
 pub struct MessageHandler<S: MessageCodec> {
-    schema_type: PhantomData<S>,
+    codec_type: PhantomData<S>,
 }
 
 impl<S: MessageCodec> Default for MessageHandler<S> {
@@ -258,16 +260,16 @@ impl<S: MessageCodec> Default for MessageHandler<S> {
 }
 
 impl<S: MessageCodec> MessageHandler<S> {
-    /// Create a new message handler for a specific schema
+    /// Create a new message handler for a specific codec
     pub fn new() -> Self {
         Self {
-            schema_type: PhantomData,
+            codec_type: PhantomData,
         }
     }
 
     /// Process a typed message
     pub fn handle(&self, message: &TypedMessage<S>) -> Result<(), Box<dyn Error>> {
-        println!("Handling message with schema: {}", message.format_id());
+        println!("Handling message with codec: {}", message.format_id());
         println!("Message content: {:#?}", message.content);
         Ok(())
     }
@@ -293,7 +295,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn json_schema_validation() {
+    fn json_codec_validation() {
         let valid_json = json!({
             "user_id": 123,
             "event_type": "login",
@@ -307,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn json_schema_serialization() {
+    fn json_codec_serialization() {
         let message = json!({
             "action": "publish",
             "topic": "events",
@@ -323,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn text_schema_validation() {
+    fn text_codec_validation() {
         let valid_text = "Hello, Samsa!".to_string();
         assert!(TextCodec::validate(&valid_text).is_ok());
 
@@ -335,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn text_schema_serialization() {
+    fn text_codec_serialization() {
         let message = "Test message".to_string();
 
         let bytes = TextCodec::serialize(&message);
