@@ -10,13 +10,18 @@ use samsa::{
     sealed::{JsonMessage, TextMessage},
     *,
 };
-use std::io::{self, Write};
 use std::sync::Arc;
+use std::{
+    io::{self, Write},
+    result::Result,
+};
 
-fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Samsa Type System Patterns Demo ===\n");
     loop {
+        println!("=================================");
         println!("Which demo would you like to run?");
+        println!("=================================\n");
         println!("  1. NewType Pattern");
         println!("  2. Parse Don't Validate");
         println!("  3. TypeState Pattern");
@@ -58,15 +63,16 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn clear_screen() -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn clear_screen() -> Result<(), Box<dyn std::error::Error>> {
     print!("\x1b[2J\x1b[H");
     io::stdout().flush()?;
     Ok(())
 }
 
-fn demonstrate_newtype_pattern() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("1. NewType Pattern for Type Safety");
+fn demonstrate_newtype_pattern() -> Result<(), Box<dyn std::error::Error>> {
     println!("==================================");
+    println!("1. NewType Pattern for Type Safety");
+    println!("==================================\n");
 
     // Valid topic creation
     let topic = TopicId::new("user.events")?;
@@ -94,9 +100,10 @@ fn demonstrate_newtype_pattern() -> std::result::Result<(), Box<dyn std::error::
     Ok(())
 }
 
-fn demonstrate_parse_dont_validate() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("2. Parse Don't Validate Pattern");
+fn demonstrate_parse_dont_validate() -> Result<(), Box<dyn std::error::Error>> {
     println!("===============================");
+    println!("2. Parse Don't Validate Pattern");
+    println!("===============================\n");
 
     // Once constructed, we know these are valid
     let topic = TopicId::new("orders.created")?;
@@ -137,9 +144,10 @@ fn demonstrate_parse_dont_validate() -> std::result::Result<(), Box<dyn std::err
     Ok(())
 }
 
-fn demonstrate_typestate_pattern() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("3. TypeState Pattern for Consumer Lifecycle");
+fn demonstrate_typestate_pattern() -> Result<(), Box<dyn std::error::Error>> {
     println!("===========================================");
+    println!("3. TypeState Pattern for Consumer Lifecycle");
+    println!("===========================================\n");
 
     let broker = Arc::new(Broker::new());
     let consumer_id = ConsumerId::new("lifecycle-demo")?;
@@ -190,9 +198,10 @@ fn demonstrate_typestate_pattern() -> std::result::Result<(), Box<dyn std::error
     Ok(())
 }
 
-fn demonstrate_sealed_traits() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("4. Sealed Traits for Message Schemas");
+fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
     println!("====================================");
+    println!("4. Sealed Traits for Message Schemas");
+    println!("====================================\n");
 
     // Create a JSON message
     let json_content = serde_json::json!({

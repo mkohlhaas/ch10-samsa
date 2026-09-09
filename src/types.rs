@@ -4,7 +4,7 @@
 //! compile-time guarantees around domain concepts.
 
 use crate::error::{Result, SamsaError};
-use std::fmt;
+use std::fmt::{self, Display};
 
 /// A type-safe wrapper for topic names
 ///
@@ -53,7 +53,7 @@ impl TopicId {
     }
 }
 
-impl fmt::Display for TopicId {
+impl Display for TopicId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -86,9 +86,14 @@ impl ConsumerId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// Convert to owned String
+    pub fn into_string(self) -> String {
+        self.0
+    }
 }
 
-impl fmt::Display for ConsumerId {
+impl Display for ConsumerId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -110,7 +115,7 @@ impl MessageId {
     }
 }
 
-impl fmt::Display for MessageId {
+impl Display for MessageId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
