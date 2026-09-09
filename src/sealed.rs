@@ -3,12 +3,9 @@
 //! This module demonstrates the sealed trait pattern to create
 //! type-safe message handling with controlled extensibility.
 
+use crate::error::SamsaError;
 use crate::types::MessageId;
-use std::{
-    error::Error,
-    fmt::{Debug, Display},
-    marker::PhantomData,
-};
+use std::{error::Error, fmt::Debug, marker::PhantomData};
 
 // ========================================== //
 // 1. Private Module to support sealed traits //
@@ -21,13 +18,9 @@ mod private {
     pub trait Sealed {}
 }
 
-// =============== //
-// 2. Sealed Trait //
-// =============== //
-
-// ------------- //
-// Message Codec //
-// ------------- //
+// ================ //
+// 2. Message Codec //
+// ================ //
 
 /// A sealed trait for message codecs
 ///
@@ -41,13 +34,89 @@ pub trait MessageCodec: private::Sealed {
     fn serialize(message: &Self::Message) -> Vec<u8>;
 
     /// Deserialize bytes to a message
-    fn deserialize(bytes: &[u8]) -> Result<Self::Message, CodecError>;
+    fn deserialize(bytes: &[u8]) -> Result<Self::Message, SamsaError>;
 
     /// Get the format identifier
     fn format_id() -> &'static str;
 
     /// Validate a message according to codec rules
-    fn validate(message: &Self::Message) -> Result<(), ValidationError>;
+    fn validate(message: &Self::Message) -> Result<(), SamsaError>;
+}
+
+// ------------ //
+// A. JsonCodec //
+// ------------ //
+
+/// JSON Codec using serde_json for flexible message structures
+pub struct JsonCodec;
+
+impl private::Sealed for JsonCodec {}
+
+impl MessageCodec for JsonCodec {
+    type Message = serde_json::Value;
+
+    fn serialize(message: &Self::Message) -> Vec<u8> {
+        serde_json::to_vec(message).unwrap_or_default()
+    }
+
+    fn deserialize(bytes: &[u8]) -> Result<Self::Message, SamsaError> {
+        serde_json::from_slice(bytes).map_err(|e| SamsaError::DeserializationFailed(e.to_string()))
+    }
+
+    fn format_id() -> &'static str {
+        "json_v1"
+    }
+
+    fn validate(message: &Self::Message) -> Result<(), SamsaError> {
+        // JSON is valid if it can be represented as serde_json::Value
+        if message.is_null() {
+            return Err(SamsaError::InvalidValue(
+                "Message cannot be null".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+// ------------ //
+// B. TextCodec //
+// ------------ //
+
+/// Text codec for simple string messages
+pub struct TextCodec;
+
+impl private::Sealed for TextCodec {}
+
+impl MessageCodec for TextCodec {
+    type Message = String;
+
+    fn serialize(message: &Self::Message) -> Vec<u8> {
+        message.as_bytes().to_vec()
+    }
+
+    fn deserialize(bytes: &[u8]) -> Result<Self::Message, SamsaError> {
+        String::from_utf8(bytes.to_vec())
+            .map_err(|e| SamsaError::DeserializationFailed(e.to_string()))
+    }
+
+    fn format_id() -> &'static str {
+        "text_v1"
+    }
+
+    fn validate(message: &Self::Message) -> Result<(), SamsaError> {
+        if message.is_empty() {
+            return Err(SamsaError::FieldRequired("message content".to_string()));
+        }
+
+        if message.len() > 10_000 {
+            return Err(SamsaError::FieldTooLong(
+                "message".to_string(),
+                message.len(),
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 // ================ //
@@ -71,7 +140,7 @@ pub struct TypedMessage<S: MessageCodec> {
 // calls function in the MessageCodec
 impl<S: MessageCodec> TypedMessage<S> {
     /// Create a new typed message
-    pub fn new(id: MessageId, content: S::Message) -> Result<Self, ValidationError> {
+    pub fn new(id: MessageId, content: S::Message) -> Result<Self, SamsaError> {
         // calling function from the trait
         S::validate(&content)?;
 
@@ -95,158 +164,12 @@ impl<S: MessageCodec> TypedMessage<S> {
     }
 }
 
-// ====== //
-// Errors //
-// ====== //
-
-// Maybe errors should be put in file error.rs.
-
-// ------------- //
-// A. CodecError //
-// ------------- //
-
-/// Errors that can occur during codec operations (deserialization function)
-/// Could be called DeserializationError.
-#[derive(Debug, Clone)]
-pub enum CodecError {
-    InvalidFormat,
-    UnknownVersion,
-    CorruptedData,
-    DeserializationFailed(String), // actually the only one really used (in deserialization functions)
-}
-
-impl Display for CodecError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CodecError::InvalidFormat => write!(f, "Invalid message format"),
-            CodecError::UnknownVersion => write!(f, "Unknown codec version"),
-            CodecError::CorruptedData => write!(f, "Corrupted message data"),
-            CodecError::DeserializationFailed(msg) => write!(f, "Deserialization failed: {}", msg),
-        }
-    }
-}
-
-impl Error for CodecError {}
-
-// ------------------ //
-// B. ValidationError //
-// ------------------ //
-
-/// Errors that can occur during message validation (validation function)
-#[derive(Debug, Clone)]
-pub enum ValidationError {
-    FieldRequired(String),
-    FieldTooLong(String, usize),
-    InvalidValue(String),
-    InvalidRange(String, i64, i64), // only one not really used
-}
-
-impl Display for ValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ValidationError::FieldRequired(field) => write!(f, "Required field missing: {}", field),
-            ValidationError::FieldTooLong(field, len) => {
-                write!(f, "Field '{}' too long: {} characters", field, len)
-            }
-            ValidationError::InvalidValue(field) => write!(f, "Invalid value for field: {}", field),
-            ValidationError::InvalidRange(field, min, max) => {
-                write!(f, "Field '{}' out of range [{}, {}]", field, min, max)
-            }
-        }
-    }
-}
-
-impl Error for ValidationError {}
-
-// ============== //
-// Message Codecs //
-// ============== //
-
-// ------------ //
-// A. JsonCodec //
-// ------------ //
-
-/// JSON Codec using serde_json for flexible message structures
-pub struct JsonCodec;
-
-impl private::Sealed for JsonCodec {}
-
-impl MessageCodec for JsonCodec {
-    type Message = serde_json::Value;
-
-    fn serialize(message: &Self::Message) -> Vec<u8> {
-        serde_json::to_vec(message).unwrap_or_default()
-    }
-
-    fn deserialize(bytes: &[u8]) -> Result<Self::Message, CodecError> {
-        serde_json::from_slice(bytes).map_err(|e| CodecError::DeserializationFailed(e.to_string()))
-    }
-
-    fn format_id() -> &'static str {
-        "json_v1"
-    }
-
-    fn validate(message: &Self::Message) -> Result<(), ValidationError> {
-        // JSON is valid if it can be represented as serde_json::Value
-        if message.is_null() {
-            return Err(ValidationError::InvalidValue(
-                "Message cannot be null".to_string(),
-            ));
-        }
-        Ok(())
-    }
-}
-
 pub type JsonMessage = TypedMessage<JsonCodec>;
-
-// ------------ //
-// B. TextCodec //
-// ------------ //
-
-/// Text codec for simple string messages
-pub struct TextCodec;
-
-impl private::Sealed for TextCodec {}
-
-impl MessageCodec for TextCodec {
-    type Message = String;
-
-    fn serialize(message: &Self::Message) -> Vec<u8> {
-        message.as_bytes().to_vec()
-    }
-
-    fn deserialize(bytes: &[u8]) -> Result<Self::Message, CodecError> {
-        String::from_utf8(bytes.to_vec())
-            .map_err(|e| CodecError::DeserializationFailed(e.to_string()))
-    }
-
-    fn format_id() -> &'static str {
-        "text_v1"
-    }
-
-    fn validate(message: &Self::Message) -> Result<(), ValidationError> {
-        if message.is_empty() {
-            return Err(ValidationError::FieldRequired(
-                "message content".to_string(),
-            ));
-        }
-
-        if message.len() > 10_000 {
-            return Err(ValidationError::FieldTooLong(
-                "message".to_string(),
-                message.len(),
-            ));
-        }
-
-        Ok(())
-    }
-}
-
 pub type TextMessage = TypedMessage<TextCodec>;
 
-// =============== //
-// Message Handler //
-// =============== //
+// ================== //
+// 4. Message Handler //
+// ================== //
 
 /// Type-safe message handler that works with any valid codec
 pub struct MessageHandler<S: MessageCodec> {

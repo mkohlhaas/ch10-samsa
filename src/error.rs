@@ -54,6 +54,40 @@ pub enum SamsaError {
     /// Connection-related errors
     #[error("Connection failed: {0}")]
     Connection(String),
+
+    // ---- Codec errors (from the sealed MessageCodec trait) ----
+    /// The message format does not match the codec
+    #[error("Invalid message format")]
+    InvalidFormat,
+
+    /// The codec version is not known to this codec
+    #[error("Unknown codec version")]
+    UnknownVersion,
+
+    /// The message data is damaged or truncated
+    #[error("Corrupted message data")]
+    CorruptedData,
+
+    /// Deserialization failed with the underlying error message
+    #[error("Deserialization failed: {0}")]
+    DeserializationFailed(String),
+
+    // ---- Validation errors (from the sealed MessageCodec trait) ----
+    /// A required field is missing
+    #[error("Required field missing: {0}")]
+    FieldRequired(String),
+
+    /// A field exceeds the maximum allowed length
+    #[error("Field '{0}' too long: {1} characters")]
+    FieldTooLong(String, usize),
+
+    /// A field has an invalid value
+    #[error("Invalid value for field: {0}")]
+    InvalidValue(String),
+
+    /// A field is outside the allowed numeric range
+    #[error("Field '{0}' out of range [{1}, {2}]")]
+    InvalidRange(String, i64, i64),
 }
 
 // Convenience constructors for common error patterns

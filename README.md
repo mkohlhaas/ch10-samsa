@@ -14,7 +14,7 @@ private, external crates cannot name it, so they can never implement
                 |     |   pub trait Sealed {}         |       |
                 |     |                               |       |
                 |     |   implementable only inside   |       |
-                |     |   this crate possible         |       |
+                |     |   this crate                  |       |
                 |     +-------------------------------+       |
                 +---------------------------------------------+
                                       |
@@ -71,7 +71,7 @@ system; it costs nothing at runtime.
    TextMessage = TypedMessage<TextCodec>
 ```
 
-## 4. Message Handler
+## 5. Message Handler
 
 `MessageHandler<S>` is schema-generic. It processes typed messages and can
 also take raw bytes, which it routes through deserialization, validation, and
@@ -86,7 +86,7 @@ construction before handling.
               +--------------------------------------------------+
 ```
 
-## 5. Type Aliases
+## 6. Type Aliases
 
 ```text
    JsonMessageHandler = MessageHandler<JsonCodec>
