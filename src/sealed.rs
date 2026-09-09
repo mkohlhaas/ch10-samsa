@@ -270,7 +270,7 @@ impl<S: MessageSchema> MessageHandler<S> {
     /// Process a typed message
     pub fn handle(&self, message: &TypedMessage<S>) -> Result<(), Box<dyn Error>> {
         println!("Handling message with schema: {}", message.schema_id());
-        println!("Message content: {:?}", message.content);
+        println!("Message content: {:#?}", message.content);
         Ok(())
     }
 
