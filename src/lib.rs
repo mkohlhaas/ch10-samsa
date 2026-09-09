@@ -14,7 +14,7 @@ pub use message::{Event, Message};
 pub use producer::Producer;
 // Chapter 10 additions - Type System Patterns
 pub use sealed::{
-    JsonMessageHandler, JsonSchema, MessageHandler, MessageSchema, TextMessageHandler, TextSchema,
+    JsonCodec, JsonMessageHandler, MessageCodec, MessageHandler, TextCodec, TextMessageHandler,
     TypedMessage,
 };
 pub use types::{ConsumerId, MessageId, TopicId};

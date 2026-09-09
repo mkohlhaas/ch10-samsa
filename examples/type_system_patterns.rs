@@ -251,7 +251,7 @@ fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "✓ Created typed JSON message with schema: {}",
-        json_message.schema_id()
+        json_message.format_id()
     );
     println!("  Message ID: {}", json_message.id);
     println!("  Content: {:#?}", json_message.content);
@@ -287,7 +287,7 @@ fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "✓ Created text message with schema: {}",
-        text_message.schema_id()
+        text_message.format_id()
     );
 
     // ------------------------- //

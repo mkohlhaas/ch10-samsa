@@ -16,7 +16,7 @@ use std::{
 
 /// Private module that contains the sealing trait
 ///
-/// This prevents external crates from implementing MessageSchema
+/// This prevents external crates from implementing MessageCodec
 mod private {
     pub trait Sealed {}
 }
@@ -31,9 +31,9 @@ mod private {
 
 /// A sealed trait for message schemas
 ///
-/// Only types within this crate can implement MessageSchema,
+/// Only types within this crate can implement MessageCodec,
 /// ensuring API stability and type safety.
-pub trait MessageSchema: private::Sealed {
+pub trait MessageCodec: private::Sealed {
     /// The Rust type that represents this message
     type Message: Clone + Debug;
 
@@ -43,8 +43,8 @@ pub trait MessageSchema: private::Sealed {
     /// Deserialize bytes to a message
     fn deserialize(bytes: &[u8]) -> Result<Self::Message, SchemaError>;
 
-    /// Get the schema identifier
-    fn schema_id() -> &'static str;
+    /// Get the format identifier
+    fn format_id() -> &'static str;
 
     /// Validate a message according to schema rules
     fn validate(message: &Self::Message) -> Result<(), ValidationError>;
@@ -52,7 +52,7 @@ pub trait MessageSchema: private::Sealed {
 
 // 3. Typed Message //
 
-// A message struct with MessageSchema as a trait bound.
+// A message struct with MessageCodec as a trait bound.
 
 /// A type-safe message container
 ///
@@ -60,14 +60,14 @@ pub trait MessageSchema: private::Sealed {
 /// compile-time guarantees about message structure.
 /// see examples
 #[derive(Debug, Clone)]
-pub struct TypedMessage<S: MessageSchema> {
+pub struct TypedMessage<S: MessageCodec> {
     pub id: MessageId,
     pub content: S::Message,
     pub schema_type: PhantomData<S>,
 }
 
-// calls function in the MessageSchema
-impl<S: MessageSchema> TypedMessage<S> {
+// calls function in the MessageCodec
+impl<S: MessageCodec> TypedMessage<S> {
     /// Create a new typed message
     pub fn new(id: MessageId, content: S::Message) -> Result<Self, ValidationError> {
         // calling function from the trait
@@ -87,9 +87,9 @@ impl<S: MessageSchema> TypedMessage<S> {
     }
 
     /// Get the schema identifier
-    pub fn schema_id(&self) -> &'static str {
+    pub fn format_id(&self) -> &'static str {
         // calling function from the trait
-        S::schema_id()
+        S::format_id()
     }
 }
 
@@ -165,11 +165,11 @@ impl Error for ValidationError {}
 // ------------- //
 
 /// JSON schema using serde_json for flexible message structures
-pub struct JsonSchema;
+pub struct JsonCodec;
 
-impl private::Sealed for JsonSchema {}
+impl private::Sealed for JsonCodec {}
 
-impl MessageSchema for JsonSchema {
+impl MessageCodec for JsonCodec {
     type Message = serde_json::Value;
 
     fn serialize(message: &Self::Message) -> Vec<u8> {
@@ -180,7 +180,7 @@ impl MessageSchema for JsonSchema {
         serde_json::from_slice(bytes).map_err(|e| SchemaError::DeserializationFailed(e.to_string()))
     }
 
-    fn schema_id() -> &'static str {
+    fn format_id() -> &'static str {
         "json_v1"
     }
 
@@ -195,18 +195,18 @@ impl MessageSchema for JsonSchema {
     }
 }
 
-pub type JsonMessage = TypedMessage<JsonSchema>;
+pub type JsonMessage = TypedMessage<JsonCodec>;
 
 // ------------- //
 // B. TextSchema //
 // ------------- //
 
 /// Text schema for simple string messages
-pub struct TextSchema;
+pub struct TextCodec;
 
-impl private::Sealed for TextSchema {}
+impl private::Sealed for TextCodec {}
 
-impl MessageSchema for TextSchema {
+impl MessageCodec for TextCodec {
     type Message = String;
 
     fn serialize(message: &Self::Message) -> Vec<u8> {
@@ -218,7 +218,7 @@ impl MessageSchema for TextSchema {
             .map_err(|e| SchemaError::DeserializationFailed(e.to_string()))
     }
 
-    fn schema_id() -> &'static str {
+    fn format_id() -> &'static str {
         "text_v1"
     }
 
@@ -240,24 +240,24 @@ impl MessageSchema for TextSchema {
     }
 }
 
-pub type TextMessage = TypedMessage<TextSchema>;
+pub type TextMessage = TypedMessage<TextCodec>;
 
 // =============== //
 // Message Handler //
 // =============== //
 
 /// Type-safe message handler that works with any valid schema
-pub struct MessageHandler<S: MessageSchema> {
+pub struct MessageHandler<S: MessageCodec> {
     schema_type: PhantomData<S>,
 }
 
-impl<S: MessageSchema> Default for MessageHandler<S> {
+impl<S: MessageCodec> Default for MessageHandler<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S: MessageSchema> MessageHandler<S> {
+impl<S: MessageCodec> MessageHandler<S> {
     /// Create a new message handler for a specific schema
     pub fn new() -> Self {
         Self {
@@ -267,7 +267,7 @@ impl<S: MessageSchema> MessageHandler<S> {
 
     /// Process a typed message
     pub fn handle(&self, message: &TypedMessage<S>) -> Result<(), Box<dyn Error>> {
-        println!("Handling message with schema: {}", message.schema_id());
+        println!("Handling message with schema: {}", message.format_id());
         println!("Message content: {:#?}", message.content);
         Ok(())
     }
@@ -280,8 +280,8 @@ impl<S: MessageSchema> MessageHandler<S> {
     }
 }
 
-pub type JsonMessageHandler = MessageHandler<JsonSchema>;
-pub type TextMessageHandler = MessageHandler<TextSchema>;
+pub type JsonMessageHandler = MessageHandler<JsonCodec>;
+pub type TextMessageHandler = MessageHandler<TextCodec>;
 
 // ===== //
 // Tests //
@@ -300,10 +300,10 @@ mod tests {
             "timestamp": 1234567890
         });
 
-        assert!(JsonSchema::validate(&valid_json).is_ok());
+        assert!(JsonCodec::validate(&valid_json).is_ok());
 
         let null_json = serde_json::Value::Null;
-        assert!(JsonSchema::validate(&null_json).is_err());
+        assert!(JsonCodec::validate(&null_json).is_err());
     }
 
     #[test]
@@ -314,10 +314,10 @@ mod tests {
             "data": {"key": "value"}
         });
 
-        let bytes = JsonSchema::serialize(&message);
+        let bytes = JsonCodec::serialize(&message);
         assert!(!bytes.is_empty());
 
-        let deserialized = JsonSchema::deserialize(&bytes).unwrap();
+        let deserialized = JsonCodec::deserialize(&bytes).unwrap();
         assert_eq!(deserialized["action"], "publish");
         assert_eq!(deserialized["topic"], "events");
     }
@@ -325,23 +325,23 @@ mod tests {
     #[test]
     fn text_schema_validation() {
         let valid_text = "Hello, Samsa!".to_string();
-        assert!(TextSchema::validate(&valid_text).is_ok());
+        assert!(TextCodec::validate(&valid_text).is_ok());
 
         let empty_text = String::new();
-        assert!(TextSchema::validate(&empty_text).is_err());
+        assert!(TextCodec::validate(&empty_text).is_err());
 
         let too_long = "x".repeat(10_001);
-        assert!(TextSchema::validate(&too_long).is_err());
+        assert!(TextCodec::validate(&too_long).is_err());
     }
 
     #[test]
     fn text_schema_serialization() {
         let message = "Test message".to_string();
 
-        let bytes = TextSchema::serialize(&message);
+        let bytes = TextCodec::serialize(&message);
         assert!(!bytes.is_empty());
 
-        let deserialized = TextSchema::deserialize(&bytes).unwrap();
+        let deserialized = TextCodec::deserialize(&bytes).unwrap();
         assert_eq!(deserialized, "Test message");
     }
 
@@ -353,9 +353,9 @@ mod tests {
         });
 
         let message_id = MessageId::new(1);
-        let typed_message = TypedMessage::<JsonSchema>::new(message_id, content).unwrap();
+        let typed_message = TypedMessage::<JsonCodec>::new(message_id, content).unwrap();
 
-        assert_eq!(typed_message.schema_id(), "json_v1");
+        assert_eq!(typed_message.format_id(), "json_v1");
     }
 
     #[test]
@@ -363,14 +363,14 @@ mod tests {
         let content = "Hello from Samsa".to_string();
 
         let message_id = MessageId::new(2);
-        let typed_message = TypedMessage::<TextSchema>::new(message_id, content).unwrap();
+        let typed_message = TypedMessage::<TextCodec>::new(message_id, content).unwrap();
 
-        assert_eq!(typed_message.schema_id(), "text_v1");
+        assert_eq!(typed_message.format_id(), "text_v1");
     }
 
     #[test]
     fn message_handler_json() {
-        let handler = MessageHandler::<JsonSchema>::new();
+        let handler = MessageHandler::<JsonCodec>::new();
 
         let content = json!({
             "event": "purchase",
@@ -378,19 +378,19 @@ mod tests {
         });
 
         let message_id = MessageId::new(3);
-        let message = TypedMessage::<JsonSchema>::new(message_id, content).unwrap();
+        let message = TypedMessage::<JsonCodec>::new(message_id, content).unwrap();
 
         assert!(handler.handle(&message).is_ok());
     }
 
     #[test]
     fn message_handler_text() {
-        let handler = MessageHandler::<TextSchema>::new();
+        let handler = MessageHandler::<TextCodec>::new();
 
         let content = "System notification".to_string();
 
         let message_id = MessageId::new(4);
-        let message = TypedMessage::<TextSchema>::new(message_id, content).unwrap();
+        let message = TypedMessage::<TextCodec>::new(message_id, content).unwrap();
 
         assert!(handler.handle(&message).is_ok());
     }
