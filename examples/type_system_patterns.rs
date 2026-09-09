@@ -31,7 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         io::stdout().flush()?;
 
         let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
+        let bytes_read = io::stdin().read_line(&mut input)?;
+        if bytes_read == 0 {
+            println!("Goodbye!");
+            break;
+        }
         let choice = input.trim();
 
         match choice {
