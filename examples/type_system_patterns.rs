@@ -10,23 +10,57 @@ use samsa::{
     sealed::{JsonMessage, TextMessage},
     *,
 };
+use std::io::{self, Write};
 use std::sync::Arc;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("=== Samsa Type System Patterns Demo ===\n");
+    loop {
+        println!("Which demo would you like to run?");
+        println!("  1. NewType Pattern");
+        println!("  2. Parse Don't Validate");
+        println!("  3. TypeState Pattern");
+        println!("  4. Sealed Traits");
+        println!("  5. Quit");
+        print!("> ");
+        io::stdout().flush()?;
 
-    // 1. NewType Pattern - Type-safe identifiers
-    demonstrate_newtype_pattern()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let choice = input.trim();
 
-    // 2. Parse Don't Validate - Validated construction
-    demonstrate_parse_dont_validate()?;
+        match choice {
+            "1" => {
+                clear_screen()?;
+                demonstrate_newtype_pattern()?;
+            }
+            "2" => {
+                clear_screen()?;
+                demonstrate_parse_dont_validate()?;
+            }
+            "3" => {
+                clear_screen()?;
+                demonstrate_typestate_pattern()?;
+            }
+            "4" => {
+                clear_screen()?;
+                demonstrate_sealed_traits()?;
+            }
+            "5" => {
+                println!("Goodbye!");
+                break;
+            }
+            "" => {}
+            _ => println!("Invalid choice, please pick a number 1-5.\n"),
+        }
+    }
 
-    // 3. TypeState Pattern - Compile-time state management
-    demonstrate_typestate_pattern()?;
+    Ok(())
+}
 
-    // 4. Sealed Traits - Controlled extensibility
-    demonstrate_sealed_traits()?;
-
+fn clear_screen() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    print!("\x1b[2J\x1b[H");
+    io::stdout().flush()?;
     Ok(())
 }
 
@@ -105,7 +139,7 @@ fn demonstrate_parse_dont_validate() -> std::result::Result<(), Box<dyn std::err
 
 fn demonstrate_typestate_pattern() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("3. TypeState Pattern for Consumer Lifecycle");
-    println!("==========================================");
+    println!("===========================================");
 
     let broker = Arc::new(Broker::new());
     let consumer_id = ConsumerId::new("lifecycle-demo")?;
@@ -131,7 +165,7 @@ fn demonstrate_typestate_pattern() -> std::result::Result<(), Box<dyn std::error
     // Now we can receive messages
     println!("Consumer can now receive messages!");
     if let Some(event) = consumer.receive() {
-        println!("Received event: {:?}", event);
+        println!("Received event: {:#?}", event);
     } else {
         println!("No messages available");
     }
@@ -182,7 +216,7 @@ fn demonstrate_sealed_traits() -> std::result::Result<(), Box<dyn std::error::Er
         json_message.schema_id()
     );
     println!("  Message ID: {}", json_message.id);
-    println!("  Content: {:?}", json_message.content);
+    println!("  Content: {:#?}", json_message.content);
 
     // Create a message handler for JSON
     let json_handler = MessageHandler::<JsonSchema>::new();
@@ -225,6 +259,7 @@ fn demonstrate_sealed_traits() -> std::result::Result<(), Box<dyn std::error::Er
     println!("✓ Only predefined schemas can be used");
     println!("✓ Compile-time guarantees about message structure");
 
+    println!();
     Ok(())
 }
 
