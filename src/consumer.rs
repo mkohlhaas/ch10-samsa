@@ -71,6 +71,7 @@ impl Consumer {
         self.offset = offset;
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

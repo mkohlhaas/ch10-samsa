@@ -160,8 +160,6 @@ impl Error for ValidationError {}
 // Message Schemas //
 // =============== //
 
-// Predefined message schemas
-
 // ------------- //
 // A. JsonSchema //
 // ------------- //
@@ -281,6 +279,9 @@ impl<S: MessageSchema> MessageHandler<S> {
         self.handle(&message)
     }
 }
+
+pub type JsonMessageHandler = MessageHandler<JsonSchema>;
+pub type TextMessageHandler = MessageHandler<TextSchema>;
 
 // ===== //
 // Tests //

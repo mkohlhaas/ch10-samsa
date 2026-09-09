@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 /// Type-level state markers for consumer lifecycle
-pub mod states {
+pub mod state {
     /// Consumer has been created but not connected
     #[derive(Debug)]
     pub struct Disconnected;
@@ -59,10 +59,10 @@ pub struct Consumer<State> {
 }
 
 /// Type aliases for different consumer states
-pub type DisconnectedConsumer = Consumer<states::Disconnected>;
-pub type ConnectedConsumer = Consumer<states::Connected>;
-pub type SubscribedConsumer = Consumer<states::Subscribed>;
-pub type PausedConsumer = Consumer<states::Paused>;
+pub type DisconnectedConsumer = Consumer<state::Disconnected>;
+pub type ConnectedConsumer = Consumer<state::Connected>;
+pub type SubscribedConsumer = Consumer<state::Subscribed>;
+pub type PausedConsumer = Consumer<state::Paused>;
 
 // Each state transition follows the same pattern: consume the current state, perform an operation,
 // and return the new state or an error. The connected consumer can subscribe to a topic or
@@ -70,7 +70,7 @@ pub type PausedConsumer = Consumer<states::Paused>;
 // the wrong state.
 
 /// Implementation for disconnected consumers
-impl Consumer<states::Disconnected> {
+impl Consumer<state::Disconnected> {
     /// Create a new disconnected consumer
     pub fn new(consumer_id: ConsumerId, broker: Arc<Broker>) -> Self {
         Self {
@@ -90,7 +90,7 @@ impl Consumer<states::Disconnected> {
         // disconnected consumer is gone.
         self,
         connection_info: ConnectionInfo,
-    ) -> Result<Consumer<states::Connected>, SamsaError> {
+    ) -> Result<Consumer<state::Connected>, SamsaError> {
         // Simulate connection logic
         if connection_info.broker_address.is_empty() {
             return Err(SamsaError::connection("Empty broker address"));
@@ -112,9 +112,9 @@ impl Consumer<states::Disconnected> {
 }
 
 /// Implementation for connected consumers
-impl Consumer<states::Connected> {
+impl Consumer<state::Connected> {
     /// Subscribe to a topic, transitioning to Subscribed state
-    pub fn subscribe(mut self, topic: TopicId) -> Result<Consumer<states::Subscribed>, SamsaError> {
+    pub fn subscribe(mut self, topic: TopicId) -> Result<Consumer<state::Subscribed>, SamsaError> {
         // Check if already subscribed
         if self.topic.is_some() {
             return Err(SamsaError::consumer("Consumer is already subscribed"));
@@ -138,7 +138,7 @@ impl Consumer<states::Connected> {
     }
 
     /// Disconnect, returning to Disconnected state
-    pub fn disconnect(self) -> Consumer<states::Disconnected> {
+    pub fn disconnect(self) -> Consumer<state::Disconnected> {
         println!("Consumer {} disconnecting", self.consumer_id);
 
         Consumer {
@@ -152,7 +152,7 @@ impl Consumer<states::Connected> {
 }
 
 /// Implementation for subscribed consumers
-impl Consumer<states::Subscribed> {
+impl Consumer<state::Subscribed> {
     /// Receive the next message (if available)
     pub fn receive(&self) -> Option<Event> {
         if let Some(ref topic) = self.topic {
@@ -168,7 +168,7 @@ impl Consumer<states::Subscribed> {
     }
 
     /// Pause message consumption, transitioning to Paused state
-    pub fn pause(self) -> Consumer<states::Paused> {
+    pub fn pause(self) -> Consumer<state::Paused> {
         println!("Consumer {} paused", self.consumer_id);
 
         Consumer {
@@ -181,7 +181,7 @@ impl Consumer<states::Subscribed> {
     }
 
     /// Unsubscribe from the topic, returning to Connected state
-    pub fn unsubscribe(mut self) -> Consumer<states::Connected> {
+    pub fn unsubscribe(mut self) -> Consumer<state::Connected> {
         if let Some(ref topic) = self.topic {
             println!(
                 "Consumer {} unsubscribing from topic {}",
@@ -201,7 +201,7 @@ impl Consumer<states::Subscribed> {
     }
 
     /// Disconnect, returning to Disconnected state
-    pub fn disconnect(self) -> Consumer<states::Disconnected> {
+    pub fn disconnect(self) -> Consumer<state::Disconnected> {
         println!("Consumer {} disconnecting", self.consumer_id);
 
         Consumer {
@@ -215,9 +215,9 @@ impl Consumer<states::Subscribed> {
 }
 
 /// Implementation for paused consumers
-impl Consumer<states::Paused> {
+impl Consumer<state::Paused> {
     /// Resume message consumption, returning to Subscribed state
-    pub fn resume(self) -> Consumer<states::Subscribed> {
+    pub fn resume(self) -> Consumer<state::Subscribed> {
         println!("Consumer {} resumed", self.consumer_id);
 
         Consumer {
@@ -230,7 +230,7 @@ impl Consumer<states::Paused> {
     }
 
     /// Unsubscribe while paused, returning to Connected state
-    pub fn unsubscribe(mut self) -> Consumer<states::Connected> {
+    pub fn unsubscribe(mut self) -> Consumer<state::Connected> {
         if let Some(ref topic) = self.topic {
             println!(
                 "Consumer {} unsubscribing from topic {} while paused",
@@ -250,7 +250,7 @@ impl Consumer<states::Paused> {
     }
 
     /// Disconnect while paused, returning to Disconnected state
-    pub fn disconnect(self) -> Consumer<states::Disconnected> {
+    pub fn disconnect(self) -> Consumer<state::Disconnected> {
         println!("Consumer {} disconnecting while paused", self.consumer_id);
 
         Consumer {
@@ -290,7 +290,7 @@ mod tests {
     fn consumer_lifecycle() {
         let broker = Arc::new(Broker::new());
         let consumer_id = ConsumerId::new("test-consumer").unwrap();
-        let topic = TopicId::new("test.topic").unwrap();
+        let topic_id = TopicId::new("test.topic").unwrap();
 
         // Start disconnected
         let consumer = Consumer::new(consumer_id, broker);
@@ -300,7 +300,7 @@ mod tests {
         let consumer = consumer.connect(connection_info).unwrap();
 
         // Subscribe
-        let consumer = consumer.subscribe(topic).unwrap();
+        let consumer = consumer.subscribe(topic_id).unwrap();
 
         // Pause and resume
         let consumer = consumer.pause();

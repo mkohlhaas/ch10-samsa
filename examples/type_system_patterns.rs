@@ -105,20 +105,35 @@ fn demonstrate_parse_dont_validate() -> Result<(), Box<dyn std::error::Error>> {
     println!("2. Parse Don't Validate Pattern");
     println!("===============================\n");
 
-    // Once constructed, we know these are valid
-    let topic = TopicId::new("orders.created")?;
-    let consumer_id = ConsumerId::new("order-processor")?;
+    // "Parse, don't validate" is a Rust design principle advocating that types should guarantee
+    // their own validity by construction, rather than allowing invalid states and checking them
+    // separately.
 
-    println!("✓ Topic '{}' is guaranteed valid", topic.as_str());
-    println!("✓ Consumer '{}' is guaranteed valid", consumer_id.as_str());
+    {
+        // The type itself is only constructable from valid data - no Result needed.
+        // Parsing IS the construction.
+        let topic_id: TopicId = "user.events".parse()?; // if it fails, no TopicId exists
+        let consumer_id: ConsumerId = "user-processor".parse()?;
 
+        println!("✓ Topic '{}' is guaranteed valid", topic_id);
+        println!("✓ Consumer '{}' is guaranteed valid", consumer_id);
+    }
+
+    {
+        // Once constructed, we know these are valid
+        let topic_id = TopicId::new("orders.created")?;
+        let consumer_id = ConsumerId::new("order-processor")?;
+
+        println!("✓ Topic '{}' is guaranteed valid", topic_id);
+        println!("✓ Consumer '{}' is guaranteed valid", consumer_id);
+    }
     // No need to re-validate when using these values
     // The type system ensures they're correct
     println!("✓ Can safely use values without re-validation");
 
     // Demonstrate validation at boundaries
     let user_inputs = vec![
-        "valid.topic".to_string(),
+        "valid.topic".to_string(),   // valid
         "".to_string(),              // Invalid: empty
         "a".repeat(200),             // Invalid: too long
         "invalid topic".to_string(), // Invalid: space
@@ -151,13 +166,13 @@ fn demonstrate_typestate_pattern() -> Result<(), Box<dyn std::error::Error>> {
 
     let broker = Arc::new(Broker::new());
     let consumer_id = ConsumerId::new("lifecycle-demo")?;
-    let topic = TopicId::new("demo.messages")?;
+    let topic_id = TopicId::new("demo.messages")?;
 
     // Start with a disconnected consumer
     println!("Creating disconnected consumer...");
     let consumer = DisconnectedConsumer::new(consumer_id, broker);
 
-    // These operations would not compile on a disconnected consumer:
+    // These operations don't compile on a disconnected consumer:
     // consumer.receive(); // Only available for subscribed consumers
     // consumer.pause();   // Only available for subscribed consumers
 
@@ -168,7 +183,7 @@ fn demonstrate_typestate_pattern() -> Result<(), Box<dyn std::error::Error>> {
 
     // Now we can subscribe (but still can't receive messages)
     println!("Subscribing to topic...");
-    let consumer = consumer.subscribe(topic)?;
+    let consumer = consumer.subscribe(topic_id)?;
 
     // Now we can receive messages
     println!("Consumer can now receive messages!");
@@ -203,7 +218,10 @@ fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
     println!("4. Sealed Traits for Message Schemas");
     println!("====================================\n");
 
-    // Create a JSON message
+    // ---------------- //
+    // Raw JSON Content //
+    // ---------------- //
+
     let json_content = serde_json::json!({
         "user_id": 12345,
         "event_type": "login",
@@ -214,9 +232,16 @@ fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Create a typed message with JSON schema
+    // -------------------//
+    // Typed JSON Message //
+    // -------------------//
+
+    println!("---------------------");
+    println!("1. Typed JSON Message");
+    println!("---------------------\n");
+
     let message_id = MessageId::new(1001);
-    // let typed_message = TypedMessage::<JsonSchema>::new(message_id, json_content)
+    // let json_message  = TypedMessage::<JsonSchema>::new(message_id, json_content)
     let json_message = JsonMessage::new(message_id, json_content)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
@@ -227,14 +252,29 @@ fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Message ID: {}", json_message.id);
     println!("  Content: {:#?}", json_message.content);
 
-    // Create a message handler for JSON
-    let json_handler = MessageHandler::<JsonSchema>::new();
+    // ------------------------- //
+    // Handle Typed JSON Message //
+    // ------------------------- //
+
+    println!("\n----------------------------");
+    println!("2. Handle Typed JSON Message");
+    println!("----------------------------\n");
+
+    let json_handler = JsonMessageHandler::new();
     json_handler
         .handle(&json_message)
         .map_err(|e| format!("Handler error: {}", e))?;
 
-    // Create a text message
+    // ------------------ //
+    // Typed Text Message //
+    // ------------------ //
+
+    println!("\n---------------------");
+    println!("3. Typed Text Message");
+    println!("---------------------\n");
+
     let text_content = "System notification: High memory usage detected".to_string();
+    println!("Original text content: {}", text_content);
 
     let text_message_id = MessageId::new(2001);
     // let text_message = TypedMessage::<TextSchema>::new(text_message_id, text_content)
@@ -242,26 +282,47 @@ fn demonstrate_sealed_traits() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
     println!(
-        "\n✓ Created text message with schema: {}",
+        "✓ Created text message with schema: {}",
         text_message.schema_id()
     );
 
+    // ------------------------- //
+    // Handle Typed Text Message //
+    // ------------------------- //
+
+    println!("\n----------------------------");
+    println!("4. Handle Typed Text Message");
+    println!("----------------------------\n");
+
     // Create a handler for text messages
-    let text_handler = MessageHandler::<TextSchema>::new();
+    let text_handler = TextMessageHandler::new();
     text_handler
         .handle(&text_message)
         .map_err(|e| format!("Handler error: {}", e))?;
 
-    // Demonstrate serialization/deserialization
-    println!("\nTesting JSON serialization:");
-    let bytes = json_message.to_bytes();
-    println!("  Serialized to {} bytes", bytes.len());
+    // --------------//
+    // Serialization //
+    // --------------//
 
-    // Test round-trip
-    let json_handler = MessageHandler::<JsonSchema>::new();
+    println!("\n--------------------------------");
+    println!("5. Serialization of JSON Message");
+    println!("--------------------------------\n");
+
+    let bytes = json_message.to_bytes();
+    println!("Serialized to {} bytes.", bytes.len());
+
+    // --------------- //
+    // Deserialization //
+    // --------------- //
+
+    println!("\n----------------------------------");
+    println!("6. Deserialization of JSON Message");
+    println!("----------------------------------\n");
+
+    let json_handler = JsonMessageHandler::new();
     match json_handler.handle_bytes(MessageId::new(1002), &bytes) {
-        Ok(()) => println!("  ✓ Deserialization successful"),
-        Err(e) => println!("  ✗ Deserialization failed: {}", e),
+        Ok(()) => println!("✓ Deserialization successful"),
+        Err(e) => println!("✗ Deserialization failed: {}", e),
     }
 
     println!("\n✓ Sealed trait pattern ensures type safety");

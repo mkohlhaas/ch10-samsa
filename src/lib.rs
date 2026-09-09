@@ -13,7 +13,10 @@ pub use error::{Result, SamsaError};
 pub use message::{Event, Message};
 pub use producer::Producer;
 // Chapter 10 additions - Type System Patterns
-pub use sealed::{JsonSchema, MessageHandler, MessageSchema, TextSchema, TypedMessage};
+pub use sealed::{
+    JsonMessageHandler, JsonSchema, MessageHandler, MessageSchema, TextMessageHandler, TextSchema,
+    TypedMessage,
+};
 pub use types::{ConsumerId, MessageId, TopicId};
 pub use typestate_consumer::{
     ConnectedConsumer, ConnectionInfo, Consumer as TypedConsumer, DisconnectedConsumer,

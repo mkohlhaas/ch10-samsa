@@ -4,12 +4,16 @@
 //! compile-time guarantees around domain concepts.
 
 use crate::error::{Result, SamsaError};
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 /// A type-safe wrapper for topic names
 ///
 /// Ensures topics are valid at construction time and
 /// provides a clear API boundary
+/// Used by type Consumer<State>.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TopicId(String);
 
@@ -59,7 +63,17 @@ impl Display for TopicId {
     }
 }
 
+impl FromStr for TopicId {
+    type Err = SamsaError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::new(s)
+    }
+}
+
 /// A type-safe wrapper for consumer IDs
+///
+/// Used by type Consumer<State> (not by old Consumer from ch09).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConsumerId(String);
 
@@ -96,6 +110,14 @@ impl ConsumerId {
 impl Display for ConsumerId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for ConsumerId {
+    type Err = SamsaError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::new(s)
     }
 }
 
@@ -143,5 +165,22 @@ mod tests {
         assert!(ConsumerId::new("consumer-1").is_ok());
         assert!(ConsumerId::new("").is_err());
         assert!(ConsumerId::new("a".repeat(65)).is_err());
+    }
+
+    #[test]
+    fn topic_id_from_str() {
+        let topic: TopicId = "user.events".parse().unwrap();
+        assert_eq!(topic.as_str(), "user.events");
+
+        assert!("".parse::<TopicId>().is_err());
+        assert!("user events".parse::<TopicId>().is_err());
+    }
+
+    #[test]
+    fn consumer_id_from_str() {
+        let id: ConsumerId = "consumer-1".parse().unwrap();
+        assert_eq!(id.as_str(), "consumer-1");
+
+        assert!("".parse::<ConsumerId>().is_err());
     }
 }
