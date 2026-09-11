@@ -1,5 +1,9 @@
 # Samsa
 
+```shell
+cargo run --example type-system-patterns
+```
+
 ## 1. Parse, don't validate
 
 "Parse, don't validate" means to enforce validity at construction time. Thereby
